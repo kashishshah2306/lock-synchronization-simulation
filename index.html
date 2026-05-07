@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lock Synchronization Simulation — OS Concepts</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #1c2230;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --amber: #d29922;
+    --purple: #bc8cff;
+    --teal: #39d353;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Header */
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header span { font-size: 13px; color: var(--text2); font-family: var(--mono); margin-left: auto; }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 300px;
+    min-height: calc(100vh - 57px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sidebar h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-weight: 600;
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+  .algo-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .algo-btn .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text3); flex-shrink: 0;
+  }
+  .algo-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border); }
+  .algo-btn.active { background: #1f6feb22; color: var(--accent); border-color: #1f6feb55; }
+  .algo-btn.active .dot { background: var(--accent); }
+
+  .sidebar-divider { height: 1px; background: var(--border); margin: 8px 0; }
+
+  .concept-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    background: var(--bg3);
+    margin: 2px 4px;
+    display: inline-block;
+  }
+  .concept-tag.green { border-color: #3fb95044; color: var(--green); background: #3fb95010; }
+  .concept-tag.red { border-color: #f8514944; color: var(--red); background: #f8514910; }
+  .concept-tag.amber { border-color: #d2992244; color: var(--amber); background: #d2992210; }
+  .concept-tag.purple { border-color: #bc8cff44; color: var(--purple); background: #bc8cff10; }
+
+  /* Main canvas */
+  main {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .sim-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .sim-title h2 { font-size: 20px; font-weight: 700; }
+  .sim-title p { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.5; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .btn {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-primary {
+    background: #1f6feb;
+    border-color: #388bfd;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #388bfd; }
+  .btn-secondary {
+    background: var(--bg3);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover { border-color: var(--text2); }
+  .btn-danger {
+    background: #490202;
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: #5a0303; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Thread arena */
+  .arena {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+  }
+  .arena-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .arena-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .threads-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+  }
+
+  .thread-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .thread-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--thread-color, var(--text3));
+    transition: all 0.3s;
+  }
+  .thread-card.running { border-color: #1f6feb55; }
+  .thread-card.running::before { background: var(--accent); }
+  .thread-card.waiting { border-color: #d2992255; animation: pulse-amber 1.5s ease-in-out infinite; }
+  .thread-card.waiting::before { background: var(--amber); }
+  .thread-card.critical { border-color: #3fb95055; }
+  .thread-card.critical::before { background: var(--green); }
+  .thread-card.blocked { border-color: #f8514944; }
+  .thread-card.blocked::before { background: var(--red); }
+  .thread-card.finished { opacity: 0.4; }
+
+  @keyframes pulse-amber {
+    0%, 100% { box-shadow: 0 0 0 0 #d2992230; }
+    50% { box-shadow: 0 0 0 4px #d2992220; }
+  }
+
+  .thread-id {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .thread-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .thread-status-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-weight: 500;
+    margin-left: auto;
+  }
+  .badge-running { background: #1f6feb22; color: var(--accent); border: 1px solid #1f6feb44; }
+  .badge-waiting { background: #d2992222; color: var(--amber); border: 1px solid #d2992244; }
+  .badge-critical { background: #3fb95022; color: var(--green); border: 1px solid #3fb95044; }
+  .badge-blocked { background: #f8514922; color: var(--red); border: 1px solid #f8514944; }
+  .badge-idle { background: var(--bg2); color: var(--text3); border: 1px solid var(--border); }
+  .badge-done { background: #21262d; color: var(--text3); border: 1px solid var(--border); }
+
+  .thread-progress {
+    height: 4px;
+    background: var(--bg);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .thread-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+  }
+  .thread-card.critical .thread-progress-fill { background: var(--green); }
+  .thread-card.waiting .thread-progress-fill { background: var(--amber); }
+  .thread-card.blocked .thread-progress-fill { background: var(--red); }
+
+  .thread-info {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  /* Lock visualizer */
+  .lock-section {
+    display: flex;
+    gap: 20px;
+  }
+
+  .lock-display {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    flex: 1;
+  }
+  .lock-display h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-bottom: 16px;
+  }
+
+  .lock-icon-wrap {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .lock-icon {
+    width: 64px; height: 64px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    border: 2px solid;
+    transition: all 0.4s ease;
+    flex-shrink: 0;
+  }
+  .lock-icon.unlocked { border-color: var(--green); background: #3fb95015; }
+  .lock-icon.locked { border-color: var(--red); background: #f8514915; animation: lock-pulse 1s ease-in-out infinite; }
+  @keyframes lock-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 #f8514930; }
+    50% { box-shadow: 0 0 0 8px #f8514915; }
+  }
+
+  .lock-info { flex: 1; }
+  .lock-info .lock-state {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .lock-info .lock-owner {
+    font-size: 13px;
+    color: var(--text2);
+    font-family: var(--mono);
+  }
+
+  /* Wait queue */
+  .wait-queue {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 200px;
+  }
+  .wait-queue h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .queue-count {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    padding: 1px 8px;
+    color: var(--text2);
+  }
+  .queue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    animation: slide-in 0.2s ease;
+    transition: all 0.2s;
+  }
+  @keyframes slide-in {
+    from { transform: translateX(-10px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .queue-item .qi-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--amber); flex-shrink: 0;
+  }
+  .queue-empty {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+    text-align: center;
+    padding: 12px;
+  }
+
+  /* Shared counter */
+  .counter-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .counter-display {
+    text-align: center;
+  }
+  .counter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-bottom: 4px;
+  }
+  .counter-value {
+    font-family: var(--mono);
+    font-size: 40px;
+    font-weight: 600;
+    color: var(--accent);
+    transition: all 0.2s;
+    line-height: 1;
+  }
+  .counter-value.updated {
+    color: var(--green);
+    transform: scale(1.1);
+  }
+  .counter-expected { font-size: 12px; color: var(--text2); margin-top: 4px; font-family: var(--mono); }
+
+  .counter-bars {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .counter-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .counter-bar-label { width: 80px; color: var(--text2); font-family: var(--mono); }
+  .counter-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--bg3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .counter-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    background: var(--accent);
+  }
+  .counter-bar-fill.green { background: var(--green); }
+  .counter-bar-fill.amber { background: var(--amber); }
+  .counter-bar-fill.red { background: var(--red); }
+  .counter-bar-val { width: 36px; text-align: right; color: var(--text2); font-family: var(--mono); font-size: 11px; }
+
+  /* Right panel */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    background: var(--bg2);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-tab {
+    flex: 1;
+    padding: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .panel-tab:hover:not(.active) { color: var(--text2); }
+
+  .panel-content { flex: 1; overflow-y: auto; }
+
+  /* Log */
+  #log-panel {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .log-entry {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    animation: log-in 0.2s ease;
+    line-height: 1.4;
+  }
+  @keyframes log-in {
+    from { opacity: 0; transform: translateX(5px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .log-time { color: var(--text3); flex-shrink: 0; font-size: 10px; padding-top: 1px; }
+  .log-msg { flex: 1; }
+  .log-entry.info { color: var(--text2); }
+  .log-entry.acquire { background: #3fb95010; color: var(--green); }
+  .log-entry.release { background: #58a6ff10; color: var(--accent); }
+  .log-entry.wait { background: #d2992210; color: var(--amber); }
+  .log-entry.critical { background: #bc8cff10; color: var(--purple); }
+  .log-entry.deadlock { background: #f8514920; color: var(--red); }
+  .log-entry.warn { background: #d2992215; color: var(--amber); }
+
+  /* Stats */
+  #stats-panel {
+    padding: 16px;
+  }
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .stat-card-label { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-bottom: 4px; }
+  .stat-card-value { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+
+  /* Theory */
+  #theory-panel { padding: 16px; }
+  .theory-section { margin-bottom: 20px; }
+  .theory-section h4 { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+  .theory-section p { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 8px; }
+  .theory-section code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: block;
+    color: var(--green);
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    margin-top: 6px;
+  }
+
+  /* Config controls */
+  .config-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .config-row label { color: var(--text2); min-width: 100px; }
+  .config-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .config-row span { color: var(--accent); font-family: var(--mono); font-size: 12px; min-width: 24px; }
+
+  /* Speed selector */
+  .speed-select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  /* Race condition indicator */
+  .race-banner {
+    display: none;
+    background: #f8514920;
+    border: 1px solid var(--red);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--red);
+    font-weight: 600;
+    align-items: center;
+    gap: 10px;
+    animation: flash 0.5s ease infinite alternate;
+  }
+  .race-banner.visible { display: flex; }
+  @keyframes flash { to { background: #f8514930; } }
+
+  /* Config panel */
+  .config-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .config-panel h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-bottom: 16px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Timeline visualization */
+  .timeline-container {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+  .timeline-container h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    font-family: var(--mono);
+    margin-bottom: 16px;
+  }
+  .timeline-wrap {
+    position: relative;
+    overflow-x: auto;
+  }
+  canvas#timeline { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚙</div>
+  <h1>Lock Synchronization Simulation</h1>
+  <span>Operating Systems — CSE 2nd Year</span>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <h2>Algorithm</h2>
+    <button class="algo-btn active" onclick="setAlgo('mutex')" id="btn-mutex">
+      <span class="dot"></span> Mutex Lock
+    </button>
+    <button class="algo-btn" onclick="setAlgo('semaphore')" id="btn-semaphore">
+      <span class="dot"></span> Semaphore
+    </button>
+    <button class="algo-btn" onclick="setAlgo('spinlock')" id="btn-spinlock">
+      <span class="dot"></span> Spinlock
+    </button>
+    <button class="algo-btn" onclick="setAlgo('readwrite')" id="btn-readwrite">
+      <span class="dot"></span> Read-Write Lock
+    </button>
+    <button class="algo-btn" onclick="setAlgo('peterson')" id="btn-peterson">
+      <span class="dot"></span> Peterson's Algorithm
+    </button>
+
+    <div class="sidebar-divider"></div>
+    <h2>Scenarios</h2>
+    <button class="algo-btn" onclick="setScenario('normal')" id="btn-normal">
+      <span class="dot"></span> Normal Execution
+    </button>
+    <button class="algo-btn" onclick="setScenario('race')" id="btn-race">
+      <span class="dot"></span> Race Condition (no lock)
+    </button>
+    <button class="algo-btn" onclick="setScenario('starvation')" id="btn-starvation">
+      <span class="dot"></span> Starvation Risk
+    </button>
+    <button class="algo-btn" onclick="setScenario('priority')" id="btn-priority">
+      <span class="dot"></span> Priority Inversion
+    </button>
+
+    <div class="sidebar-divider"></div>
+    <h2>OS Concepts</h2>
+    <span class="concept-tag green">Critical Section</span>
+    <span class="concept-tag red">Deadlock</span>
+    <span class="concept-tag amber">Starvation</span>
+    <span class="concept-tag purple">Mutual Exclusion</span>
+    <span class="concept-tag">Atomic Ops</span>
+    <span class="concept-tag">Context Switch</span>
+  </aside>
+
+  <!-- Main -->
+  <main>
+
+    <!-- Sim header -->
+    <div class="sim-header">
+      <div class="sim-title">
+        <h2 id="algo-title">Mutex Lock Simulation</h2>
+        <p id="algo-desc">A mutex (mutual exclusion) allows only one thread to access the critical section at a time. Other threads block and wait until the mutex is released.</p>
+      </div>
+      <div class="controls">
+        <select class="speed-select" id="speed-select" onchange="setSpeed(this.value)">
+          <option value="2000">Slow (2×)</option>
+          <option value="1000" selected>Normal (1×)</option>
+          <option value="400">Fast (0.4×)</option>
+          <option value="100">Turbo</option>
+        </select>
+        <button class="btn btn-secondary" onclick="resetSim()" id="reset-btn">↺ Reset</button>
+        <button class="btn btn-primary" onclick="startSim()" id="start-btn">▶ Start</button>
+        <button class="btn btn-danger" onclick="stopSim()" id="stop-btn" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <!-- Config -->
+    <div class="config-panel">
+      <h3>Configuration</h3>
+      <div style="display:flex;gap:40px;flex-wrap:wrap;">
+        <div class="config-row">
+          <label>Threads</label>
+          <input type="range" min="2" max="6" value="4" id="thread-count" oninput="updateConfig()">
+          <span id="thread-count-val">4</span>
+        </div>
+        <div class="config-row">
+          <label>Semaphore N</label>
+          <input type="range" min="1" max="4" value="1" id="sem-n" oninput="updateConfig()">
+          <span id="sem-n-val">1</span>
+        </div>
+        <div class="config-row">
+          <label>Iterations</label>
+          <input type="range" min="2" max="10" value="5" id="iterations" oninput="updateConfig()">
+          <span id="iterations-val">5</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Race banner -->
+    <div class="race-banner" id="race-banner">
+      ⚠ Race Condition Detected! Counter value is inconsistent — multiple threads modified shared data simultaneously.
+    </div>
+
+    <!-- Thread arena -->
+    <div class="arena">
+      <div class="arena-label">Threads</div>
+      <div class="threads-grid" id="threads-grid"></div>
+    </div>
+
+    <!-- Lock + queue -->
+    <div class="lock-section">
+      <div class="lock-display">
+        <h3>Lock / Synchronization Primitive</h3>
+        <div class="lock-icon-wrap">
+          <div class="lock-icon unlocked" id="lock-icon">🔓</div>
+          <div class="lock-info">
+            <div class="lock-state" id="lock-state">Unlocked</div>
+            <div class="lock-owner" id="lock-owner">Owner: none</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px;" id="lock-extra">Waiting: 0 threads</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;" id="sem-slots"></div>
+      </div>
+      <div class="wait-queue" id="wait-queue-panel">
+        <h3>Wait Queue <span class="queue-count" id="queue-count">0</span></h3>
+        <div id="wait-queue-list">
+          <div class="queue-empty">No threads waiting</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Counter -->
+    <div class="counter-section">
+      <div class="counter-display">
+        <div class="counter-label">Shared Counter</div>
+        <div class="counter-value" id="counter-display">0</div>
+        <div class="counter-expected" id="counter-expected">Expected: 0</div>
+      </div>
+      <div class="counter-bars" id="counter-bars">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline-container">
+      <h3>Thread Activity Timeline</h3>
+      <div class="timeline-wrap">
+        <canvas id="timeline" width="800" height="100"></canvas>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <button class="panel-tab active" onclick="switchTab('log')">Event Log</button>
+      <button class="panel-tab" onclick="switchTab('stats')">Stats</button>
+      <button class="panel-tab" onclick="switchTab('theory')">Theory</button>
+    </div>
+    <div class="panel-content">
+      <div id="log-panel"></div>
+      <div id="stats-panel" style="display:none"></div>
+      <div id="theory-panel" style="display:none"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---- State ----
+let currentAlgo = 'mutex';
+let currentScenario = 'normal';
+let simRunning = false;
+let simIntervals = [];
+let simTimeouts = [];
+let SPEED = 1000;
+let THREAD_COUNT = 4;
+let SEM_N = 1;
+let ITERATIONS = 5;
+
+const THREAD_COLORS = ['#58a6ff','#3fb950','#f0883e','#bc8cff','#f85149','#39d353'];
+const THREAD_NAMES  = ['Thread-1','Thread-2','Thread-3','Thread-4','Thread-5','Thread-6'];
+
+let lockState = { locked: false, owner: null, count: 1 };
+let waitQueue = [];
+let sharedCounter = 0;
+let expectedCounter = 0;
+let raceOccurred = false;
+let threadStates = [];
+let stats = { contextSwitches: 0, totalWaitTime: 0, lockAcquisitions: 0, raceConditions: 0, criticalSectionTime: 0 };
+let timelineData = [];
+let tlTick = 0;
+
+// ---- Algo info ----
+const ALGO_INFO = {
+  mutex: {
+    title: 'Mutex Lock Simulation',
+    desc: 'A mutex (mutual exclusion) allows only one thread to access the critical section at a time. Other threads block and wait until the mutex is released.',
+    theory: `<div class="theory-section">
+      <h4>What is a Mutex?</h4>
+      <p>A mutex (mutual exclusion lock) is a synchronization primitive that ensures only one thread can access a critical section at a time. It has two operations:</p>
+      <p><strong>Lock (acquire):</strong> If unlocked, the thread takes ownership. If locked, the thread blocks.</p>
+      <p><strong>Unlock (release):</strong> The owner releases the mutex, waking a waiting thread.</p>
+      <code>// Pseudocode
+mutex.lock();
+  // Critical Section
+  shared_counter++;
+mutex.unlock();</code>
+    </div>
+    <div class="theory-section">
+      <h4>Properties Guaranteed</h4>
+      <p><strong>Mutual Exclusion:</strong> Only one thread in critical section.</p>
+      <p><strong>Progress:</strong> If no thread is in CS, one waiting thread can enter.</p>
+      <p><strong>Bounded Waiting:</strong> A thread won't wait indefinitely (FIFO queue).</p>
+    </div>`
+  },
+  semaphore: {
+    title: 'Semaphore Simulation',
+    desc: 'A semaphore is an integer counter with P (wait/down) and V (signal/up) operations. With N > 1, multiple threads can be in the critical section simultaneously.',
+    theory: `<div class="theory-section">
+      <h4>What is a Semaphore?</h4>
+      <p>A semaphore is a generalization of the mutex. It maintains an integer count. When count > 0, a thread can proceed. When 0, threads block.</p>
+      <code>// Binary semaphore (N=1) = Mutex
+// Counting semaphore (N>1)
+
+P(semaphore): // wait / down
+  while (S == 0) wait;
+  S = S - 1;
+
+V(semaphore): // signal / up
+  S = S + 1;</code>
+      <p>Use <strong>Semaphore N</strong> slider to control how many threads can be in the CS simultaneously.</p>
+    </div>`
+  },
+  spinlock: {
+    title: 'Spinlock Simulation',
+    desc: 'A spinlock uses busy-waiting — the thread continuously checks (spins) until the lock is free. No blocking, no context switch, but wastes CPU.',
+    theory: `<div class="theory-section">
+      <h4>What is a Spinlock?</h4>
+      <p>Unlike mutex (which blocks and sleeps), a spinlock keeps the CPU busy in a loop until the lock is free. Suitable for very short critical sections in multi-core systems.</p>
+      <code>// Spinlock using atomic CAS
+void lock() {
+  while (test_and_set(&lock)) {
+    // busy-wait: spin here!
+  }
+}
+
+void unlock() {
+  lock = false;
+}</code>
+      <p><strong>Advantage:</strong> No context switch overhead.</p>
+      <p><strong>Disadvantage:</strong> Wastes CPU cycles while spinning.</p>
+    </div>`
+  },
+  readwrite: {
+    title: 'Read-Write Lock Simulation',
+    desc: 'Readers can access the resource concurrently, but writers need exclusive access. Improves performance for read-heavy workloads.',
+    theory: `<div class="theory-section">
+      <h4>Reader-Writer Problem</h4>
+      <p>A read-write lock allows multiple readers simultaneously, but only one writer at a time with no readers.</p>
+      <code>// Reader acquires
+rlock.read_lock();
+  read(data); // concurrent OK
+rlock.read_unlock();
+
+// Writer acquires
+rlock.write_lock();
+  write(data); // exclusive
+rlock.write_unlock();</code>
+      <p>Threads are randomly assigned as readers (70%) or writers (30%) in this simulation.</p>
+    </div>`
+  },
+  peterson: {
+    title: "Peterson's Algorithm",
+    desc: "A software-based mutual exclusion solution for 2 processes, using only shared variables — no hardware support needed.",
+    theory: `<div class="theory-section">
+      <h4>Peterson's Algorithm</h4>
+      <p>Works for exactly 2 processes. Uses two shared variables: <code>flag[]</code> and <code>turn</code>.</p>
+      <code>// Process i enters CS:
+flag[i] = true;
+turn = j;          // give preference to j
+while (flag[j] && turn == j) {
+  /* busy-wait */
+}
+// --- Critical Section ---
+// Exit CS:
+flag[i] = false;</code>
+      <p>Satisfies all three conditions: mutual exclusion, progress, and bounded waiting. Limited to 2 processes (shown as Thread-1 and Thread-2).</p>
+    </div>`
+  }
+};
+
+// ---- Helpers ----
+function setId(id, html) { const e = document.getElementById(id); if(e) e.innerHTML = html; }
+function getId(id) { return document.getElementById(id); }
+
+function log(msg, type='info') {
+  const panel = getId('log-panel');
+  const time = performance.now().toFixed(0);
+  const el = document.createElement('div');
+  el.className = `log-entry ${type}`;
+  el.innerHTML = `<span class="log-time">${time}ms</span><span class="log-msg">${msg}</span>`;
+  panel.insertBefore(el, panel.firstChild);
+  while(panel.children.length > 80) panel.removeChild(panel.lastChild);
+}
+
+function delay(ms) {
+  return new Promise(resolve => {
+    const t = setTimeout(resolve, ms);
+    simTimeouts.push(t);
+  });
+}
+
+function clearTimers() {
+  simIntervals.forEach(clearInterval);
+  simTimeouts.forEach(clearTimeout);
+  simIntervals = [];
+  simTimeouts = [];
+}
+
+// ---- Config ----
+function updateConfig() {
+  THREAD_COUNT = parseInt(getId('thread-count').value);
+  SEM_N = parseInt(getId('sem-n').value);
+  ITERATIONS = parseInt(getId('iterations').value);
+  getId('thread-count-val').textContent = THREAD_COUNT;
+  getId('sem-n-val').textContent = SEM_N;
+  getId('iterations-val').textContent = ITERATIONS;
+  if(!simRunning) initThreadCards();
+}
+
+function setSpeed(v) { SPEED = parseInt(v); }
+
+function setAlgo(algo) {
+  currentAlgo = algo;
+  document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+  getId('btn-'+algo).classList.add('active');
+  const info = ALGO_INFO[algo];
+  getId('algo-title').textContent = info.title;
+  getId('algo-desc').textContent = info.desc;
+  setId('theory-panel', info.theory);
+  if(!simRunning) { resetSim(); initThreadCards(); }
+  updateSemSlots();
+}
+
+function setScenario(s) {
+  currentScenario = s;
+  document.querySelectorAll('.algo-btn').forEach(b => {
+    if(['btn-normal','btn-race','btn-starvation','btn-priority'].includes(b.id)) b.classList.remove('active');
+  });
+  getId('btn-'+s).classList.add('active');
+  if(!simRunning) resetSim();
+}
+
+// ---- Thread Cards ----
+function initThreadCards() {
+  const n = (currentAlgo === 'peterson') ? 2 : THREAD_COUNT;
+  const grid = getId('threads-grid');
+  grid.innerHTML = '';
+  threadStates = [];
+  for(let i=0;i<n;i++) {
+    threadStates.push({ id:i, status:'idle', progress:0, iterations:0, waitTime:0, color: THREAD_COLORS[i] });
+    const card = document.createElement('div');
+    card.className = 'thread-card';
+    card.id = `thread-card-${i}`;
+    card.style.setProperty('--thread-color', THREAD_COLORS[i]);
+    card.innerHTML = threadCardHTML(i, 'idle', 0, 0);
+    grid.appendChild(card);
+  }
+  updateCounterBars();
+  timelineData = Array(n).fill(null).map(()=>[]);
+  drawTimeline();
+}
+
+function threadCardHTML(i, status, progress, iterations) {
+  const badges = {
+    idle:'<span class="thread-status-badge badge-idle">idle</span>',
+    running:'<span class="thread-status-badge badge-running">running</span>',
+    waiting:'<span class="thread-status-badge badge-waiting">waiting</span>',
+    critical:'<span class="thread-status-badge badge-critical">in CS</span>',
+    blocked:'<span class="thread-status-badge badge-blocked">blocked</span>',
+    spinning:'<span class="thread-status-badge badge-waiting">spinning</span>',
+    reading:'<span class="thread-status-badge badge-running">reading</span>',
+    writing:'<span class="thread-status-badge badge-critical">writing</span>',
+    done:'<span class="thread-status-badge badge-done">done</span>'
+  };
+  const extra = {
+    idle:'Waiting to run', running:'Executing instructions',
+    waiting:'Queued for lock', critical:'Inside critical section',
+    blocked:'Blocked on mutex', spinning:'Busy-waiting (CPU spinning)',
+    reading:'Reading shared data', writing:'Writing shared data',
+    done:`Completed ${iterations} iterations`
+  };
+  return `
+    <div class="thread-id">#TID-${String(i).padStart(3,'0')}</div>
+    <div class="thread-name" style="color:${THREAD_COLORS[i]}">${THREAD_NAMES[i]} ${badges[status]||badges.idle}</div>
+    <div class="thread-info">${extra[status]||'Idle'}</div>
+    <div class="thread-info" style="margin-top:4px">Completed: ${iterations}/${ITERATIONS}</div>
+    <div class="thread-progress"><div class="thread-progress-fill" style="width:${progress}%"></div></div>
+  `;
+}
+
+function updateThreadCard(i, status, progress, iterations) {
+  const card = getId(`thread-card-${i}`);
+  if(!card) return;
+  card.className = `thread-card ${status}`;
+  card.style.setProperty('--thread-color', THREAD_COLORS[i]);
+  card.innerHTML = threadCardHTML(i, status, progress, iterations);
+}
+
+// ---- Lock Display ----
+function updateLockDisplay(locked, owner, waiting, semCount) {
+  const icon = getId('lock-icon');
+  const state = getId('lock-state');
+  const ownerEl = getId('lock-owner');
+  const extra = getId('lock-extra');
+
+  if(currentAlgo === 'semaphore') {
+    const rem = semCount !== undefined ? semCount : (locked ? 0 : SEM_N);
+    icon.className = rem === 0 ? 'lock-icon locked' : 'lock-icon unlocked';
+    icon.textContent = rem === 0 ? '🔒' : '🔓';
+    state.textContent = `Semaphore: ${rem}/${SEM_N}`;
+    state.style.color = rem === 0 ? 'var(--red)' : 'var(--green)';
+    ownerEl.textContent = owner ? `Owner: ${THREAD_NAMES[owner.id !== undefined ? owner.id : owner]}` : 'Owner: —';
+  } else if(currentAlgo === 'readwrite') {
+    icon.className = locked ? 'lock-icon locked' : 'lock-icon unlocked';
+    icon.textContent = locked ? '🔒' : '🔓';
+    state.textContent = locked ? (owner === 'writer' ? 'Write Locked' : `Read Locked`) : 'Unlocked';
+    state.style.color = locked ? (owner==='writer' ? 'var(--red)' : 'var(--amber)') : 'var(--green)';
+    ownerEl.textContent = locked ? `Mode: ${owner}` : 'Mode: free';
+  } else {
+    icon.className = locked ? 'lock-icon locked' : 'lock-icon unlocked';
+    icon.textContent = locked ? '🔒' : '🔓';
+    state.textContent = locked ? 'Locked' : 'Unlocked';
+    state.style.color = locked ? 'var(--red)' : 'var(--green)';
+    ownerEl.textContent = owner !== null ? `Owner: ${THREAD_NAMES[owner]}` : 'Owner: none';
+  }
+  extra.textContent = `Waiting: ${waiting} thread${waiting!==1?'s':''}`;
+  updateWaitQueue();
+  updateSemSlots(semCount);
+}
+
+function updateSemSlots(count) {
+  const wrap = getId('sem-slots');
+  if(currentAlgo !== 'semaphore') { wrap.innerHTML=''; return; }
+  const n = SEM_N;
+  const rem = count !== undefined ? count : n;
+  wrap.innerHTML = '';
+  for(let i=0;i<n;i++) {
+    const s = document.createElement('div');
+    s.style.cssText = `width:32px;height:32px;border-radius:8px;border:1.5px solid;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.3s;`;
+    if(i < rem) {
+      s.style.borderColor='var(--green)'; s.style.background='#3fb95015'; s.textContent='●';
+      s.style.color='var(--green)';
+    } else {
+      s.style.borderColor='var(--red)'; s.style.background='#f8514915'; s.textContent='○';
+      s.style.color='var(--red)';
+    }
+    wrap.appendChild(s);
+  }
+}
+
+// ---- Wait Queue ----
+function updateWaitQueue() {
+  const list = getId('wait-queue-list');
+  const count = getId('queue-count');
+  count.textContent = waitQueue.length;
+  if(waitQueue.length === 0) {
+    list.innerHTML = '<div class="queue-empty">No threads waiting</div>';
+    return;
+  }
+  list.innerHTML = waitQueue.map((tid,idx) => `
+    <div class="queue-item">
+      <span class="qi-dot"></span>
+      <span style="color:${THREAD_COLORS[tid]};font-weight:600">${THREAD_NAMES[tid]}</span>
+      <span style="color:var(--text3);margin-left:auto">#${idx+1}</span>
+    </div>`).join('');
+}
+
+// ---- Counter ----
+function updateCounter(val, expected) {
+  sharedCounter = val;
+  const el = getId('counter-display');
+  el.textContent = val;
+  el.classList.remove('updated');
+  void el.offsetWidth;
+  el.classList.add('updated');
+  setTimeout(()=>el.classList.remove('updated'), 300);
+  getId('counter-expected').textContent = `Expected: ${expected}`;
+  if(val !== expected && currentScenario !== 'race') {
+    // minor discrepancy OK
+  }
+}
+
+function updateCounterBars() {
+  const bars = getId('counter-bars');
+  if(!threadStates.length) { bars.innerHTML=''; return; }
+  bars.innerHTML = threadStates.map((t,i)=>`
+    <div class="counter-bar-row">
+      <span class="counter-bar-label" style="color:${THREAD_COLORS[i]}">${THREAD_NAMES[i]}</span>
+      <div class="counter-bar-track"><div class="counter-bar-fill ${i===0?'':'green'}" id="bar-fill-${i}" style="width:0%"></div></div>
+      <span class="counter-bar-val" id="bar-val-${i}">0</span>
+    </div>`).join('');
+}
+
+function updateBar(i, done, total) {
+  const fill = getId(`bar-fill-${i}`);
+  const val = getId(`bar-val-${i}`);
+  if(fill) fill.style.width = (done/total*100)+'%';
+  if(val) val.textContent = done;
+}
+
+// ---- Stats ----
+function updateStats() {
+  const panel = getId('stats-panel');
+  panel.innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">Context Switches</div><div class="stat-card-value" style="color:var(--accent)">${stats.contextSwitches}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Lock Acquisitions</div><div class="stat-card-value" style="color:var(--green)">${stats.lockAcquisitions}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Race Conditions Detected</div><div class="stat-card-value" style="color:${stats.raceConditions>0?'var(--red)':'var(--green)'}">${stats.raceConditions}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Total Wait Events</div><div class="stat-card-value" style="color:var(--amber)">${waitQueue.length + stats.totalWaitTime}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Shared Counter</div><div class="stat-card-value" style="color:var(--purple)">${sharedCounter}</div></div>
+    <div class="stat-card"><div class="stat-card-label">Expected Counter</div><div class="stat-card-value" style="color:var(--text2)">${expectedCounter}</div></div>
+  `;
+}
+
+// ---- Timeline ----
+function recordTimeline(threadId, type) {
+  if(!timelineData[threadId]) timelineData[threadId]=[];
+  timelineData[threadId].push({ t: tlTick++, type });
+  drawTimeline();
+}
+
+function drawTimeline() {
+  const canvas = getId('timeline');
+  const n = threadStates.length || THREAD_COUNT;
+  const ROW = 22; const PAD = 4;
+  canvas.height = n * ROW + PAD*2;
+  canvas.width = Math.max(800, tlTick*12+60);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const colors = { idle:'#30363d', running:'#58a6ff', waiting:'#d29922', critical:'#3fb950', blocked:'#f85149', spinning:'#bc8cff', reading:'#39d353', writing:'#f0883e' };
+  for(let i=0;i<n;i++) {
+    const y = PAD + i*ROW;
+    ctx.fillStyle='#161b22';
+    ctx.fillRect(0, y, canvas.width, ROW-2);
+    ctx.fillStyle=THREAD_COLORS[i]+'44';
+    ctx.fillRect(0, y, 50, ROW-2);
+    ctx.fillStyle=THREAD_COLORS[i];
+    ctx.font='10px JetBrains Mono,monospace';
+    ctx.fillText(`T-${i+1}`, 6, y+14);
+    if(timelineData[i]) {
+      timelineData[i].forEach((ev,idx)=>{
+        const x = 56 + idx*12;
+        ctx.fillStyle = colors[ev.type]||'#58a6ff';
+        ctx.fillRect(x, y+3, 10, ROW-8);
+      });
+    }
+  }
+  // Legend
+  // (omit for brevity — colors visible from cards)
+}
+
+// ---- Simulation Logic ----
+async function runMutex() {
+  const n = THREAD_COUNT;
+  let mutex = { locked:false, owner:null };
+  let semCount = 1; // unused for mutex display
+  sharedCounter = 0;
+  expectedCounter = 0;
+  const threadDone = Array(n).fill(0);
+
+  updateLockDisplay(false, null, 0);
+  log('Simulation started — Mutex Lock', 'info');
+  log(`${n} threads, ${ITERATIONS} iterations each`, 'info');
+
+  const promises = threadStates.map(async (t) => {
+    const id = t.id;
+    for(let iter=0;iter<ITERATIONS;iter++) {
+      if(!simRunning) return;
+      updateThreadCard(id, 'running', (iter/ITERATIONS*100), iter);
+      recordTimeline(id, 'running');
+      await delay(SPEED * 0.3 + Math.random()*SPEED*0.2);
+      if(!simRunning) return;
+
+      // Try to acquire mutex
+      if(mutex.locked) {
+        updateThreadCard(id, 'blocked', (iter/ITERATIONS*100), iter);
+        recordTimeline(id, 'blocked');
+        waitQueue.push(id);
+        updateLockDisplay(mutex.locked, mutex.owner, waitQueue.length);
+        log(`${THREAD_NAMES[id]} blocked — waiting for mutex`, 'wait');
+        stats.totalWaitTime++;
+        while(mutex.locked && simRunning) {
+          await delay(SPEED*0.2);
+        }
+        waitQueue = waitQueue.filter(x=>x!==id);
+        updateLockDisplay(mutex.locked, mutex.owner, waitQueue.length);
+      }
+      if(!simRunning) return;
+
+      // Acquire
+      mutex.locked = true; mutex.owner = id;
+      stats.lockAcquisitions++;
+      stats.contextSwitches++;
+      updateLockDisplay(true, id, waitQueue.length);
+      updateThreadCard(id, 'critical', ((iter+0.5)/ITERATIONS*100), iter);
+      recordTimeline(id, 'critical');
+      log(`${THREAD_NAMES[id]} acquired mutex — entering critical section`, 'acquire');
+
+      // Critical section
+      await delay(SPEED * 0.5);
+      sharedCounter++;
+      expectedCounter++;
+      updateCounter(sharedCounter, expectedCounter);
+      threadDone[id]++;
+      updateBar(id, threadDone[id], ITERATIONS);
+      log(`${THREAD_NAMES[id]} incremented counter → ${sharedCounter}`, 'critical');
+
+      // Release
+      mutex.locked = false; mutex.owner = null;
+      updateLockDisplay(false, null, waitQueue.length);
+      updateThreadCard(id, 'running', ((iter+1)/ITERATIONS*100), iter+1);
+      recordTimeline(id, 'running');
+      log(`${THREAD_NAMES[id]} released mutex`, 'release');
+      stats.contextSwitches++;
+
+      await delay(SPEED * 0.2);
+    }
+    updateThreadCard(id, 'done', 100, ITERATIONS);
+    recordTimeline(id, 'idle');
+    log(`${THREAD_NAMES[id]} finished all iterations`, 'info');
+  });
+
+  await Promise.all(promises);
+  if(simRunning) {
+    log(`✓ Simulation complete. Counter: ${sharedCounter} / Expected: ${expectedCounter}`, 'acquire');
+    endSim();
+  }
+}
+
+async function runSemaphore() {
+  const n = THREAD_COUNT;
+  let semaphore = SEM_N;
+  sharedCounter = 0; expectedCounter = 0;
+  const threadDone = Array(n).fill(0);
+  updateLockDisplay(false, null, 0, semaphore);
+  log(`Simulation started — Semaphore (N=${SEM_N})`, 'info');
+
+  const promises = threadStates.map(async (t) => {
+    const id = t.id;
+    for(let iter=0;iter<ITERATIONS;iter++) {
+      if(!simRunning) return;
+      updateThreadCard(id, 'running', (iter/ITERATIONS*100), iter);
+      recordTimeline(id, 'running');
+      await delay(SPEED*0.3 + Math.random()*SPEED*0.2);
+      if(!simRunning) return;
+
+      // P operation
+      if(semaphore <= 0) {
+        updateThreadCard(id, 'waiting', (iter/ITERATIONS*100), iter);
+        recordTimeline(id, 'waiting');
+        waitQueue.push(id);
+        updateLockDisplay(semaphore===0, null, waitQueue.length, semaphore);
+        log(`${THREAD_NAMES[id]} waiting — semaphore=0`, 'wait');
+        while(semaphore <= 0 && simRunning) await delay(SPEED*0.2);
+        waitQueue = waitQueue.filter(x=>x!==id);
+      }
+      if(!simRunning) return;
+      semaphore--;
+      stats.lockAcquisitions++;
+      updateLockDisplay(semaphore===0, {id}, waitQueue.length, semaphore);
+      updateThreadCard(id, 'critical', ((iter+0.5)/ITERATIONS*100), iter);
+      recordTimeline(id, 'critical');
+      log(`${THREAD_NAMES[id]} entered CS — semaphore=${semaphore}`, 'acquire');
+
+      await delay(SPEED*0.5);
+      sharedCounter++; expectedCounter++;
+      updateCounter(sharedCounter, expectedCounter);
+      threadDone[id]++;
+      updateBar(id, threadDone[id], ITERATIONS);
+
+      // V operation
+      semaphore++;
+      updateLockDisplay(semaphore===0, null, waitQueue.length, semaphore);
+      recordTimeline(id, 'running');
+      log(`${THREAD_NAMES[id]} left CS — semaphore=${semaphore}`, 'release');
+      await delay(SPEED*0.2);
+    }
+    updateThreadCard(id, 'done', 100, ITERATIONS);
+    log(`${THREAD_NAMES[id]} done`, 'info');
+  });
+
+  await Promise.all(promises);
+  if(simRunning) { log(`✓ Semaphore sim complete`, 'acquire'); endSim(); }
+}
+
+async function runSpinlock() {
+  const n = THREAD_COUNT;
+  let spinlock = false;
+  sharedCounter = 0; expectedCounter = 0;
+  const threadDone = Array(n).fill(0);
+  updateLockDisplay(false, null, 0);
+  log('Simulation started — Spinlock (busy-waiting)', 'info');
+
+  const promises = threadStates.map(async (t) => {
+    const id = t.id;
+    for(let iter=0;iter<ITERATIONS;iter++) {
+      if(!simRunning) return;
+      updateThreadCard(id, 'running', (iter/ITERATIONS*100), iter);
+      recordTimeline(id, 'running');
+      await delay(SPEED*0.2 + Math.random()*SPEED*0.3);
+
+      // Spin
+      let spins = 0;
+      while(spinlock && simRunning) {
+        updateThreadCard(id, 'spinning', (iter/ITERATIONS*100), iter);
+        recordTimeline(id, 'spinning');
+        if(spins===0) { waitQueue.push(id); log(`${THREAD_NAMES[id]} spinning (busy-wait)...`, 'wait'); stats.totalWaitTime++; }
+        spins++;
+        await delay(SPEED*0.15);
+      }
+      waitQueue = waitQueue.filter(x=>x!==id);
+      if(!simRunning) return;
+
+      spinlock = true;
+      stats.lockAcquisitions++; stats.contextSwitches++;
+      updateLockDisplay(true, id, waitQueue.length);
+      updateThreadCard(id, 'critical', ((iter+0.5)/ITERATIONS*100), iter);
+      recordTimeline(id, 'critical');
+      log(`${THREAD_NAMES[id]} acquired spinlock (spun ${spins}×)`, 'acquire');
+
+      await delay(SPEED*0.4);
+      sharedCounter++; expectedCounter++;
+      updateCounter(sharedCounter, expectedCounter);
+      threadDone[id]++;
+      updateBar(id, threadDone[id], ITERATIONS);
+
+      spinlock = false;
+      updateLockDisplay(false, null, waitQueue.length);
+      log(`${THREAD_NAMES[id]} released spinlock`, 'release');
+      await delay(SPEED*0.1);
+    }
+    updateThreadCard(id, 'done', 100, ITERATIONS);
+    log(`${THREAD_NAMES[id]} done`, 'info');
+  });
+
+  await Promise.all(promises);
+  if(simRunning) { log(`✓ Spinlock sim complete`, 'acquire'); endSim(); }
+}
+
+async function runReadWrite() {
+  const n = THREAD_COUNT;
+  let readers = 0; let writing = false;
+  sharedCounter = 0; expectedCounter = 0;
+  const threadDone = Array(n).fill(0);
+  const isReader = threadStates.map(()=>Math.random()<0.65);
+  updateLockDisplay(false, null, 0);
+  log('Simulation started — Read-Write Lock', 'info');
+  threadStates.forEach((t,i)=>log(`${THREAD_NAMES[i]} assigned as ${isReader[i]?'Reader':'Writer'}`, 'info'));
+
+  const promises = threadStates.map(async (t) => {
+    const id = t.id;
+    const reader = isReader[id];
+    for(let iter=0;iter<ITERATIONS;iter++) {
+      if(!simRunning) return;
+      updateThreadCard(id, 'running', (iter/ITERATIONS*100), iter);
+      recordTimeline(id, 'running');
+      await delay(SPEED*0.3 + Math.random()*SPEED*0.2);
+
+      if(reader) {
+        while(writing && simRunning) {
+          waitQueue.push(id);
+          updateLockDisplay(true, 'writer', waitQueue.length);
+          log(`${THREAD_NAMES[id]} (reader) waiting for writer`, 'wait');
+          await delay(SPEED*0.2);
+          waitQueue = waitQueue.filter(x=>x!==id);
+        }
+        if(!simRunning) return;
+        readers++;
+        updateLockDisplay(readers>0, 'reader', waitQueue.length);
+        updateThreadCard(id, 'reading', ((iter+0.5)/ITERATIONS*100), iter);
+        recordTimeline(id, 'reading');
+        log(`${THREAD_NAMES[id]} reading — ${readers} concurrent readers`, 'acquire');
+        await delay(SPEED*0.4);
+        readers--;
+        updateLockDisplay(readers>0||writing, readers>0?'reader':'writer', waitQueue.length);
+        log(`${THREAD_NAMES[id]} done reading`, 'release');
+      } else {
+        while((writing || readers>0) && simRunning) {
+          waitQueue.push(id);
+          updateLockDisplay(true, writing?'writer':'reader', waitQueue.length);
+          log(`${THREAD_NAMES[id]} (writer) waiting`, 'wait');
+          await delay(SPEED*0.2);
+          waitQueue = waitQueue.filter(x=>x!==id);
+        }
+        if(!simRunning) return;
+        writing = true;
+        stats.lockAcquisitions++;
+        updateLockDisplay(true, 'writer', waitQueue.length);
+        updateThreadCard(id, 'writing', ((iter+0.5)/ITERATIONS*100), iter);
+        recordTimeline(id, 'writing');
+        log(`${THREAD_NAMES[id]} writing (exclusive)`, 'acquire');
+        await delay(SPEED*0.5);
+        sharedCounter++; expectedCounter++;
+        updateCounter(sharedCounter, expectedCounter);
+        writing = false;
+        updateLockDisplay(false, null, waitQueue.length);
+        log(`${THREAD_NAMES[id]} done writing`, 'release');
+      }
+      threadDone[id]++;
+      updateBar(id, threadDone[id], ITERATIONS);
+      await delay(SPEED*0.15);
+    }
+    updateThreadCard(id, 'done', 100, ITERATIONS);
+    log(`${THREAD_NAMES[id]} done`, 'info');
+  });
+
+  await Promise.all(promises);
+  if(simRunning) { log(`✓ Read-Write sim complete`, 'acquire'); endSim(); }
+}
+
+async function runPeterson() {
+  let flag = [false, false]; let turn = 0;
+  sharedCounter = 0; expectedCounter = 0;
+  const threadDone = [0, 0];
+  updateLockDisplay(false, null, 0);
+  log("Simulation started — Peterson's Algorithm (2 threads)", 'info');
+
+  const thread = async (id) => {
+    const j = 1 - id;
+    for(let iter=0;iter<ITERATIONS;iter++) {
+      if(!simRunning) return;
+      updateThreadCard(id, 'running', (iter/ITERATIONS*100), iter);
+      recordTimeline(id, 'running');
+      await delay(SPEED*0.3 + Math.random()*SPEED*0.2);
+
+      flag[id] = true; turn = j;
+      log(`${THREAD_NAMES[id]}: flag[${id}]=true, turn=${j}`, 'info');
+
+      let spins = 0;
+      while(flag[j] && turn === j && simRunning) {
+        if(spins===0) { waitQueue.push(id); log(`${THREAD_NAMES[id]} spinning (Peterson)`, 'wait'); }
+        spins++;
+        updateThreadCard(id, 'spinning', (iter/ITERATIONS*100), iter);
+        recordTimeline(id, 'spinning');
+        updateLockDisplay(true, id===0?1:0, waitQueue.length);
+        await delay(SPEED*0.2);
+      }
+      waitQueue = waitQueue.filter(x=>x!==id);
+      if(!simRunning) return;
+
+      stats.lockAcquisitions++;
+      updateLockDisplay(true, id, waitQueue.length);
+      updateThreadCard(id, 'critical', ((iter+0.5)/ITERATIONS*100), iter);
+      recordTimeline(id, 'critical');
+      log(`${THREAD_NAMES[id]} in critical section`, 'acquire');
+
+      await delay(SPEED*0.5);
+      sharedCounter++; expectedCounter++;
+      updateCounter(sharedCounter, expectedCounter);
+      threadDone[id]++;
+      updateBar(id, threadDone[id], ITERATIONS);
+
+      flag[id] = false;
+      updateLockDisplay(false, null, waitQueue.length);
+      log(`${THREAD_NAMES[id]} exiting CS, flag[${id}]=false`, 'release');
+      await delay(SPEED*0.2);
+    }
+    updateThreadCard(id, 'done', 100, ITERATIONS);
+    log(`${THREAD_NAMES[id]} done`, 'info');
+  };
+
+  await Promise.all([thread(0), thread(1)]);
+  if(simRunning) { log(`✓ Peterson's sim complete`, 'acquire'); endSim(); }
+}
+
+async function runRaceCondition() {
+  const n = THREAD_COUNT;
+  sharedCounter = 0; expectedCounter = 0;
+  const threadDone = Array(n).fill(0);
+  raceOccurred = false;
+  updateLockDisplay(false, null, 0);
+  log('⚠ Race Condition demo — NO lock used!', 'warn');
+  log('Multiple threads will modify shared counter simultaneously', 'warn');
+
+  const promises = threadStates.map(async (t) => {
+    const id = t.id;
+    for(let iter=0;iter<ITERATIONS;iter++) {
+      if(!simRunning) return;
+      updateThreadCard(id, 'running', (iter/ITERATIONS*100), iter);
+      recordTimeline(id, 'running');
+      await delay(SPEED*0.1 + Math.random()*SPEED*0.3);
+
+      // Simulate race: read
+      const localVal = sharedCounter;
+      log(`${THREAD_NAMES[id]} reads counter=${localVal}`, 'info');
+      updateThreadCard(id, 'critical', ((iter+0.5)/ITERATIONS*100), iter);
+      recordTimeline(id, 'critical');
+
+      // context switch delay — other thread may write
+      await delay(SPEED * 0.15);
+
+      // write back without locking
+      sharedCounter = localVal + 1;
+      expectedCounter++;
+      updateCounter(sharedCounter, expectedCounter);
+
+      if(sharedCounter !== expectedCounter) {
+        raceOccurred = true;
+        stats.raceConditions++;
+        getId('race-banner').classList.add('visible');
+        log(`⚠ RACE CONDITION! Counter=${sharedCounter} but expected=${expectedCounter}`, 'deadlock');
+      }
+
+      threadDone[id]++;
+      updateBar(id, threadDone[id], ITERATIONS);
+      await delay(SPEED*0.1);
+    }
+    updateThreadCard(id, 'done', 100, ITERATIONS);
+  });
+
+  await Promise.all(promises);
+  if(simRunning) {
+    if(raceOccurred) log(`✗ Race conditions caused incorrect result!`, 'deadlock');
+    else log(`Counter correct by chance — race conditions are non-deterministic!`, 'warn');
+    endSim();
+  }
+}
+
+// ---- Sim lifecycle ----
+async function startSim() {
+  if(simRunning) return;
+  simRunning = true;
+  stats = { contextSwitches:0, totalWaitTime:0, lockAcquisitions:0, raceConditions:0 };
+  sharedCounter = 0; expectedCounter = 0; waitQueue = [];
+  getId('race-banner').classList.remove('visible');
+  getId('start-btn').disabled = true;
+  getId('stop-btn').disabled = false;
+  getId('reset-btn').disabled = true;
+  getId('sem-n').disabled = true;
+  getId('thread-count').disabled = true;
+  getId('iterations').disabled = true;
+  initThreadCards();
+  updateCounterBars();
+  updateStats();
+  setId('theory-panel', ALGO_INFO[currentAlgo]?.theory || '');
+
+  if(currentScenario === 'race') { await runRaceCondition(); return; }
+
+  switch(currentAlgo) {
+    case 'mutex': await runMutex(); break;
+    case 'semaphore': await runSemaphore(); break;
+    case 'spinlock': await runSpinlock(); break;
+    case 'readwrite': await runReadWrite(); break;
+    case 'peterson': await runPeterson(); break;
+  }
+}
+
+function stopSim() {
+  simRunning = false;
+  clearTimers();
+  endSim();
+  log('Simulation stopped by user', 'warn');
+}
+
+function endSim() {
+  simRunning = false;
+  clearTimers();
+  getId('start-btn').disabled = false;
+  getId('stop-btn').disabled = true;
+  getId('reset-btn').disabled = false;
+  getId('sem-n').disabled = false;
+  getId('thread-count').disabled = false;
+  getId('iterations').disabled = false;
+  updateStats();
+}
+
+function resetSim() {
+  stopSim();
+  sharedCounter = 0; expectedCounter = 0;
+  waitQueue = [];
+  stats = { contextSwitches:0, totalWaitTime:0, lockAcquisitions:0, raceConditions:0 };
+  tlTick = 0;
+  getId('race-banner').classList.remove('visible');
+  getId('log-panel').innerHTML = '';
+  updateCounter(0, 0);
+  updateLockDisplay(false, null, 0);
+  updateStats();
+  initThreadCards();
+  updateCounterBars();
+  log('Simulation reset', 'info');
+}
+
+// ---- Tabs ----
+function switchTab(tab) {
+  ['log','stats','theory'].forEach(t => {
+    getId(t+'-panel').style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.panel-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['log','stats','theory'][i] === tab);
+  });
+  if(tab==='stats') updateStats();
+  if(tab==='theory') setId('theory-panel', ALGO_INFO[currentAlgo]?.theory||'');
+}
+
+// ---- Init ----
+window.onload = () => {
+  updateConfig();
+  setAlgo('mutex');
+  setId('theory-panel', ALGO_INFO.mutex.theory);
+  log('Ready — select an algorithm and click Start', 'info');
+  log('Tip: Try "Race Condition" scenario to see why locks matter!', 'warn');
+};
+</script>
+</body>
+</html>
